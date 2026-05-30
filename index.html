@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Nebula Vortex | Interactive Audio-Reactive Cosmos</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Poppins', 'Montserrat', 'Arial', sans-serif;
+        }
+
+        /* Enhanced UI with interactive elements */
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 200;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(10, 10, 20, 0.6);
+            backdrop-filter: blur(12px);
+            padding: 12px 20px;
+            border-radius: 28px;
+            pointer-events: none;
+            font-weight: 400;
+            font-size: 13px;
+            border-left: 3px solid #ff66cc;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            font-family: monospace;
+        }
+
+        .title {
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            z-index: 200;
+            color: white;
+            font-size: 1.9rem;
+            font-weight: 700;
+            text-shadow: 0 0 30px rgba(0,0,0,0.6);
+            background: linear-gradient(135deg, #fff, #ff99cc, #aa88ff);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            pointer-events: none;
+            letter-spacing: 3px;
+        }
+
+        .interaction-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 200;
+            color: rgba(255,255,210,0.8);
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 24px;
+            font-size: 11px;
+            font-family: monospace;
+            pointer-events: none;
+            border-right: 2px solid #ff99cc;
+        }
+
+        /* Audio control button - interactive element */
+        .audio-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 300;
+            background: rgba(20, 20, 40, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 100, 200, 0.6);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .audio-btn:hover {
+            background: rgba(255, 80, 160, 0.3);
+            border-color: #ff66cc;
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(255, 100, 200, 0.4);
+        }
+
+        .audio-btn:active {
+            transform: scale(0.98);
+        }
+
+        .visualizer-badge {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            z-index: 200;
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 10px;
+            color: #ffccff;
+            font-family: monospace;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+
+        @media (max-width: 700px) {
+            .title { font-size: 1.3rem; top: 12px; right: 12px; }
+            .info-panel { font-size: 9px; bottom: 12px; left: 12px; padding: 6px 12px; }
+            .audio-btn { padding: 6px 12px; font-size: 11px; top: 12px; left: 12px; }
+            .interaction-hint { font-size: 8px; }
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">✦SAI KIRAN✦</div>
+    <div class="info-panel">
+        🎧 AUDIO REACTIVE | 🖱️ MOUSE ATTRACTS PARTICLES | 🌈 DYNAMIC AURORA
+    </div>
+    <div class="interaction-hint">
+        🌀 Drag to rotate • Scroll to zoom • Hover/click near particles → they dance!
+    </div>
+    <button id="audioBtn" class="audio-btn">
+        🎵 ACTIVATE AUDIO VISUALIZER
+    </button>
+    <div class="visualizer-badge" id="audioStatus">⚪ Audio inactive</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // --- setup core scene ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020218);
+        scene.fog = new THREE.FogExp2(0x020218, 0.0006);
+
+        const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(9, 5, 20);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.toneMappingExposure = 1.3;
+        document.body.appendChild(renderer.domElement);
+
+        // --- post-processing bloom ---
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.3, 0.4, 0.85);
+        bloomPass.threshold = 0.08;
+        bloomPass.strength = 0.95;
+        bloomPass.radius = 0.7;
+        const effectComposer = new EffectComposer(renderer);
+        effectComposer.addPass(renderScene);
+        effectComposer.addPass(bloomPass);
+
+        // --- interactive controls with auto-rotate ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.rotateSpeed = 1.2;
+        controls.zoomSpeed = 1.3;
+        controls.panSpeed = 0.9;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.65;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.set(0, 0.5, 0);
+
+        // --- lighting for depth ---
+        const ambient = new THREE.AmbientLight(0x111133);
+        scene.add(ambient);
+        const coreLight = new THREE.PointLight(0xff66aa, 0.8, 25);
+        coreLight.position.set(0, 0.5, 0);
+        scene.add(coreLight);
+        const movingLight = new THREE.PointLight(0x44aaff, 0.5);
+        scene.add(movingLight);
+
+        // --- MAIN PARTICLE GALAXY (dynamic positions for audio/mouse interaction) ---
+        const particleCount = 52000;
+        const geometry = new THREE.BufferGeometry();
+        const initialPositions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3); // for gentle drift & mouse force
+        const colorsArray = new Float32Array(particleCount * 3);
+
+        const arms = 3;
+        const spiralTightness = 2.6;
+        const armSpread = 0.48;
+        const innerRadius = 1.1;
+        const outerRadius = 13.5;
+
+        const coreColor1 = new THREE.Color(0xffaa99);
+        const coreColor2 = new THREE.Color(0xff77aa);
+        const armColor1 = new THREE.Color(0x88bbff);
+        const armColor2 = new THREE.Color(0xff99dd);
+        const armColor3 = new THREE.Color(0x88ffdd);
+
+        for (let i = 0; i < particleCount; i++) {
+            let r, angle, yOffset;
+            let isCore = Math.random() < 0.16;
+            if (isCore) {
+                r = Math.pow(Math.random(), 1.3) * 1.8;
+                angle = Math.random() * Math.PI * 2;
+                yOffset = (Math.random() - 0.5) * 1.0;
+            } else {
+                r = innerRadius + Math.pow(Math.random(), 1.45) * (outerRadius - innerRadius);
+                const spiralAngle = spiralTightness * Math.log(r + 0.6) + (Math.random() - 0.5) * armSpread;
+                const armIdx = Math.floor(Math.random() * arms);
+                const armAngleOffset = (armIdx / arms) * Math.PI * 2;
+                angle = spiralAngle + armAngleOffset + (Math.random() - 0.5) * 0.5;
+                if (r > 7) angle += (Math.random() - 0.5) * 0.8;
+                const warp = Math.sin(angle * 1.8) * 0.25;
+                yOffset = (Math.random() - 0.5) * 0.65 * (1 + r / outerRadius) + warp;
+                if (Math.random() < 0.15 && r > 5) yOffset += (Math.random() - 0.5) * 1.2;
+            }
+            const x = Math.cos(angle) * r;
+            const z = Math.sin(angle) * r;
+            const y = isCore ? (Math.random() - 0.5) * 0.9 : yOffset * 1.2;
+            initialPositions[i*3] = x;
+            initialPositions[i*3+1] = y;
+            initialPositions[i*3+2] = z;
+
+            // store small random velocity for subtle motion
+            velocities[i*3] = (Math.random() - 0.5) * 0.008;
+            velocities[i*3+1] = (Math.random() - 0.5) * 0.006;
+            velocities[i*3+2] = (Math.random() - 0.5) * 0.008;
+
+            // color logic
+            const dist = Math.hypot(x, z, y);
+            let color;
+            if (dist < 1.8) {
+                color = new THREE.Color().setHSL(0.05 + Math.random()*0.08, 0.9, 0.7);
+            } else if (dist < 4.5) {
+                color = new THREE.Color().setHSL(0.55 + Math.random()*0.2, 0.8, 0.65);
+            } else {
+                color = new THREE.Color().setHSL(0.6 + Math.random()*0.3, 0.7, 0.55);
+            }
+            if (Math.random() > 0.7) color.multiplyScalar(1.2);
+            colorsArray[i*3] = color.r;
+            colorsArray[i*3+1] = color.g;
+            colorsArray[i*3+2] = color.b;
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(initialPositions.slice(), 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colorsArray, 3));
+
+        const particleTexture = (() => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(0.4, 'rgba(255,180,100,0.9)');
+            grad.addColorStop(0.7, 'rgba(255,80,120,0.6)');
+            grad.addColorStop(1, 'rgba(80,40,120,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        })();
+
+        const particleMat = new THREE.PointsMaterial({ size: 0.11, map: particleTexture, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false });
+        const particleSystem = new THREE.Points(geometry, particleMat);
+        scene.add(particleSystem);
+
+        // --- background stars and dust fields (simplified but added)---
+        const bgStarCount = 12000;
+        const bgGeo = new THREE.BufferGeometry();
+        const bgPositions = new Float32Array(bgStarCount * 3);
+        for (let i = 0; i < bgStarCount; i++) {
+            const rad = 45 + Math.random() * 120;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            bgPositions[i*3] = rad * Math.sin(phi) * Math.cos(theta);
+            bgPositions[i*3+1] = rad * Math.sin(phi) * Math.sin(theta) * 0.5;
+            bgPositions[i*3+2] = rad * Math.cos(phi);
+        }
+        bgGeo.setAttribute('position', new THREE.BufferAttribute(bgPositions, 3));
+        const bgMat = new THREE.PointsMaterial({ color: 0x88aaff, size: 0.07, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending });
+        const bgStars = new THREE.Points(bgGeo, bgMat);
+        scene.add(bgStars);
+
+        // --- decorative glowing rings ---
+        const ringMain = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.06, 128, 400), new THREE.MeshStandardMaterial({ color: 0xff66cc, emissive: 0xff44aa, emissiveIntensity: 0.7, transparent: true, opacity: 0.5 }));
+        ringMain.rotation.x = Math.PI / 2;
+        scene.add(ringMain);
+        const ringOuter = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.04, 128, 600), new THREE.MeshStandardMaterial({ color: 0x44aaff, emissive: 0x2266cc, emissiveIntensity: 0.5, transparent: true }));
+        ringOuter.rotation.x = Math.PI / 2 + 0.2;
+        scene.add(ringOuter);
+        const coreSphere = new THREE.Mesh(new THREE.SphereGeometry(0.55, 48, 48), new THREE.MeshStandardMaterial({ color: 0xffaa99, emissive: 0xff4488, emissiveIntensity: 1.1, roughness: 0.3 }));
+        scene.add(coreSphere);
+
+        // --- MOUSE INTERACTION: force field affecting particles ---
+        const mouse = new THREE.Vector2(0, 0);
+        const mouseWorld = new THREE.Vector3(0, 0, 0);
+        const raycaster = new THREE.Raycaster();
+        let mouseInfluenceStrength = 0;
+        let mouseActive = false;
+
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            const targetPoint = new THREE.Vector3();
+            if (raycaster.ray.intersectPlane(planeZ, targetPoint)) {
+                mouseWorld.copy(targetPoint);
+                mouseWorld.z = Math.max(-10, Math.min(10, mouseWorld.z));
+                mouseWorld.x = Math.max(-12, Math.min(12, mouseWorld.x));
+                mouseWorld.y = Math.max(-6, Math.min(6, mouseWorld.y));
+            }
+            mouseInfluenceStrength = 0.8;
+            mouseActive = true;
+            setTimeout(() => { mouseInfluenceStrength *= 0.98; }, 50);
+        });
+
+        // also click creates a small pulse
+        window.addEventListener('click', () => {
+            mouseInfluenceStrength = 1.4;
+            coreLight.intensity = 1.4;
+            setTimeout(() => { coreLight.intensity = 0.8; }, 200);
+        });
+
+        // --- AUDIO REACTIVE FEATURE ---
+        let audioContext = null;
+        let audioSource = null;
+        let audioData = null;
+        let audioActive = false;
+        let analyser = null;
+        const audioBtn = document.getElementById('audioBtn');
+        const audioStatusSpan = document.getElementById('audioStatus');
+
+        async function initAudio() {
+            if (audioContext && audioActive) {
+                // close and reset
+                await audioContext.close();
+                audioActive = false;
+                audioStatusSpan.innerHTML = '⚪ Audio inactive';
+                audioBtn.innerHTML = '🎵 ACTIVATE AUDIO VISUALIZER';
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                audioData = new Uint8Array(bufferLength);
+                audioSource = audioContext.createMediaStreamSource(stream);
+                audioSource.connect(analyser);
+                // no output to speakers
+                await audioContext.resume();
+                audioActive = true;
+                audioStatusSpan.innerHTML = '🎧 AUDIO ACTIVE • beat reactive colors & pulse';
+                audioBtn.innerHTML = '🔇 DEACTIVATE AUDIO';
+                startAudioReactivity();
+            } catch (err) {
+                console.warn("Audio permission denied or error:", err);
+                audioStatusSpan.innerHTML = '❌ Microphone access denied';
+                audioActive = false;
+            }
+        }
+
+        function startAudioReactivity() {
+            if (!analyser) return;
+            const updateAudio = () => {
+                if (!audioActive || !analyser) return;
+                analyser.getByteFrequencyData(audioData);
+                let avg = 0;
+                for (let i = 0; i < audioData.length; i++) avg += audioData[i];
+                avg /= audioData.length;
+                const intensity = Math.min(1.2, avg / 140);
+                // pulse rings and lights
+                const pulseScale = 1 + intensity * 0.4;
+                coreSphere.scale.setScalar(1 + intensity * 0.2);
+                ringMain.material.emissiveIntensity = 0.6 + intensity * 1.2;
+                ringOuter.material.emissiveIntensity = 0.4 + intensity * 0.9;
+                coreLight.intensity = 0.7 + intensity * 1.1;
+                movingLight.intensity = 0.4 + intensity * 0.8;
+                // modulate particle size based on bass
+                const bass = audioData[0] / 255;
+                particleMat.size = 0.11 + bass * 0.06;
+                // also change colors slightly: bloom strength
+                bloomPass.strength = 0.85 + intensity * 0.4;
+                requestAnimationFrame(updateAudio);
+            };
+            updateAudio();
+        }
+
+        audioBtn.addEventListener('click', () => {
+            if (!audioActive) {
+                initAudio();
+            } else {
+                if (audioContext) audioContext.close().then(() => {
+                    audioActive = false;
+                    audioStatusSpan.innerHTML = '⚪ Audio inactive';
+                    audioBtn.innerHTML = '🎵 ACTIVATE AUDIO VISUALIZER';
+                    particleMat.size = 0.11;
+                    bloomPass.strength = 0.95;
+                }).catch(e=>console.log);
+            }
+        });
+
+        // --- additional interactive floating particles that swirl around mouse ---
+        const extraSwirlCount = 3000;
+        const swirlGeo = new THREE.BufferGeometry();
+        const swirlPos = new Float32Array(extraSwirlCount * 3);
+        for (let i = 0; i < extraSwirlCount; i++) {
+            swirlPos[i*3] = (Math.random() - 0.5) * 14;
+            swirlPos[i*3+1] = (Math.random() - 0.5) * 7;
+            swirlPos[i*3+2] = (Math.random() - 0.5) * 12;
+        }
+        swirlGeo.setAttribute('position', new THREE.BufferAttribute(swirlPos, 3));
+        const swirlMat = new THREE.PointsMaterial({ color: 0xff99cc, size: 0.045, transparent: true, blending: THREE.AdditiveBlending });
+        const swirlParticles = new THREE.Points(swirlGeo, swirlMat);
+        scene.add(swirlParticles);
+
+        // --- animation variables: update particle positions with mouse force and gentle rotation fields ---
+        const positionAttribute = geometry.attributes.position;
+        const originalPosArray = initialPositions.slice(); // reference for elastic return
+        let timeAnim = 0;
+
+        function updateParticlesWithInteraction() {
+            const positionsAttr = positionAttribute.array;
+            const influenceRadius = 2.5;
+            const strength = Math.min(1.2, mouseInfluenceStrength * 0.9);
+
+            for (let i = 0; i < particleCount; i++) {
+                const ix = i*3, iy = i*3+1, iz = i*3+2;
+                const origX = originalPosArray[ix];
+                const origY = originalPosArray[iy];
+                const origZ = originalPosArray[iz];
+                let dx = 0, dy = 0, dz = 0;
+
+                // mouse interaction
+                if (mouseActive && strength > 0.02) {
+                    const px = positionsAttr[ix];
+                    const py = positionsAttr[iy];
+                    const pz = positionsAttr[iz];
+                    const distToMouse = Math.hypot(px - mouseWorld.x, py - mouseWorld.y, pz - mouseWorld.z);
+                    if (distToMouse < influenceRadius) {
+                        const force = (1 - distToMouse / influenceRadius) * strength * 0.12;
+                        const angleForce = Math.atan2(mouseWorld.z - pz, mouseWorld.x - px);
+                        dx += Math.cos(angleForce) * force;
+                        dz += Math.sin(angleForce) * force;
+                        dy += (mouseWorld.y - py) * force * 0.8;
+                    }
+                }
+
+                // gentle wave + drift (cosmic wind)
+                const waveX = Math.sin(timeAnim * 0.7 + origZ * 0.6) * 0.003;
+                const waveZ = Math.cos(timeAnim * 0.5 + origX * 0.5) * 0.003;
+                const waveY = Math.sin(timeAnim * 0.9 + origX * 0.8) * 0.002;
+
+                // return elasticity to original orbit
+                const currX = positionsAttr[ix], currY = positionsAttr[iy], currZ = positionsAttr[iz];
+                const returnForceX = (origX - currX) * 0.008;
+                const returnForceY = (origY - currY) * 0.007;
+                const returnForceZ = (origZ - currZ) * 0.008;
+
+                let newX = currX + dx + waveX + returnForceX + velocities[ix];
+                let newY = currY + dy + waveY + returnForceY + velocities[iy];
+                let newZ = currZ + dz + waveZ + returnForceZ + velocities[iz];
+
+                // clamp to avoid explosion
+                positionsAttr[ix] = newX;
+                positionsAttr[iy] = newY;
+                positionsAttr[iz] = newZ;
+            }
+            positionAttribute.needsUpdate = true;
+            mouseActive = false;
+        }
+
+        // --- also update swirl particles to rotate and follow subtle mouse effect ---
+        let swirlAngle = 0;
+
+        // --- dynamic color shift for galaxy based on audio / time ---
+        function updateDynamicColors() {
+            if (!audioActive) {
+                // subtle color drift over time
+                const hue = (timeAnim * 0.03) % 1;
+                const colorShift = new THREE.Color().setHSL(hue, 0.6, 0.5);
+                ringMain.material.color.setHSL(0.55 + Math.sin(timeAnim)*0.05, 0.8, 0.6);
+                ringOuter.material.color.setHSL(0.6 + Math.cos(timeAnim*0.7)*0.07, 0.7, 0.55);
+            } else {
+                // audio reactive colors already handled by emissive intensity, but also rotate ring hue
+                const beat = audioData ? (audioData[0]/255) : 0;
+                ringMain.material.color.setHSL(0.65 + beat * 0.2, 0.9, 0.6);
+            }
+        }
+
+        // --- ANIMATION LOOP ---
+        let lastTimestamp = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            timeAnim += 0.016;
+
+            updateParticlesWithInteraction();
+            updateDynamicColors();
+
+            // rotate rings and decorative elements
+            ringMain.rotation.z = timeAnim * 0.3;
+            ringMain.rotation.x = Math.sin(timeAnim * 0.5) * 0.15 + Math.PI/2;
+            ringOuter.rotation.z = timeAnim * 0.2;
+            ringOuter.rotation.x = Math.sin(timeAnim * 0.4) * 0.1 + Math.PI/2 + 0.2;
+            swirlParticles.rotation.y = timeAnim * 0.15;
+            swirlParticles.rotation.x = Math.sin(timeAnim * 0.25) * 0.1;
+
+            // moving light orbits
+            movingLight.position.x = Math.sin(timeAnim * 0.9) * 4.5;
+            movingLight.position.z = Math.cos(timeAnim * 0.7) * 5;
+            movingLight.position.y = Math.sin(timeAnim * 1.2) * 1.5;
+
+            // subtle pulsing of core sphere
+            const glint = 0.9 + Math.sin(timeAnim * 5) * 0.1;
+            coreSphere.material.emissiveIntensity = 0.9 + Math.sin(timeAnim * 4) * 0.3;
+
+            controls.update();
+            effectComposer.render();
+        }
+
+        animate();
+
+        // resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            effectComposer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // small initial hint
+        console.log('✨ Nebula Vortex Enhanced: Interactive Audio + Mouse Force ready');
+    </script>
+</body>
+</html>
